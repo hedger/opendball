@@ -10,14 +10,13 @@
 
 #define MAXTURNRATIO 0.5
 #define MINTURNRATIO 0.05
-#define ROCKETSPEED 900.0
+#define ROCKETSPEED 700.0
 
 new Rockets[32];
 new Targets[32];
 new Launches[32][3];
-new target;
-new LastVictim;
-new LastKiller;
+//new LastVictim;
+//new LastKiller;
 new g_BeamSprite;
 new g_HaloSprite;
 
@@ -30,14 +29,19 @@ public OnPluginStart()
   g_BeamSprite = PrecacheModel("materials/sprites/laser.vmt");
   g_HaloSprite = PrecacheModel("materials/sprites/halo01.vmt");
   RegConsoleCmd("sm_rocket", Command_Rocket)
-  RegConsoleCmd("sm_lock", Command_Lockon)
+
+  //RegConsoleCmd("sm_lock", Command_Lockon)
   //HookEvent("object_deflected", Event_ObjectDeflected)
 	HookEvent("player_death", Event_PlayerDeath, EventHookMode_Pre)
 	HookEvent("player_changeclass", Event_PlayerClass, EventHookMode_Pre)
+
+  CreateTimer(0.1, RocketThink, _, TIMER_REPEAT)
+  
 	for(new i = 0; i < 32; i++)
 	{
     Rockets[i] = -1
   }
+
 }
 
 public Action:Command_Rocket(client, args)
@@ -45,15 +49,10 @@ public Action:Command_Rocket(client, args)
   SpawnRocket(client)
 }
 
-public Action:Command_Lockon(client, args)
+stock Event_ObjectDeflected(Handle:event, const String:name[], bool:dontBroadcast)
 {
-  LockTarget(client)
-}
-
-public Event_ObjectDeflected(Handle:event, const String:name[], bool:dontBroadcast)
-{
-	new client = GetClientOfUserId(GetEventInt(event, "userid"));
-	new owner = GetClientOfUserId(GetEventInt(event, "ownerid"));
+	//new client = GetClientOfUserId(GetEventInt(event, "userid"));
+	//new owner = GetClientOfUserId(GetEventInt(event, "ownerid"));
   //PrintToChatAll("\x04In-Hook, Owner:%d User:%d", owner, client);
 	switch(GetEventInt(event, "weaponid"))
 	{
@@ -216,8 +215,9 @@ else
 // Rocket processing
 //=======================================
 
-public OnGameFrame()
+public Action:RocketThink(Handle:timer)
 {
+  //PrintToChatAll("Rocket::Think");
   new Float:ang[3];
   new Float:vec[3];
   new Float:vel[3];
@@ -241,6 +241,7 @@ public OnGameFrame()
     rocket = EntRefToEntIndex(Rockets[i]);
     if (rocket != -1)
       {
+      //PrintToChatAll("Rocket%i::Think", i);
       GetEntPropVector(rocket, Prop_Send, "m_vecOrigin", rocketPos);
 
       GetEntPropVector(rocket, Prop_Data, "m_vecVelocity", vel);  // вектор скорости ракеты
@@ -250,7 +251,6 @@ public OnGameFrame()
       rocketTeam = GetEntData(rocket, FindSendPropInfo("CTFProjectile_Rocket", "m_iTeamNum"))
       if (!((lTarget > 0) && IsValidEntity(lTarget) && IsClientInGame(lTarget) && IsPlayerAlive(lTarget)))
         {
-        //PrintToChatAll("\x04Fail detected for rocket#%i of team %i", rocket, rocketTeam);
         if (lTarget==0)
           {
           PrintToChatAll("\x04No target");
@@ -261,24 +261,17 @@ public OnGameFrame()
       if (rocketTeam == GetClientTeam(lTarget))
       {
         //PrintToChatAll("Friendly target");
-        PrintToChatAll("\x05Deflected, saving pos %f %f %f", rocketPos[0], rocketPos[1], rocketPos[2]);
-        //UpdateLaunch(rocket, rocketPos)
+        //PrintToChatAll("\x05Deflected, saving pos %f %f %f", rocketPos[0], rocketPos[1], rocketPos[2]);
         Launches[i] = rocketPos;
         lTarget = RandomPlayer(GetOppositeTeam(rocketTeam));
         Targets[i] = lTarget
       }
 
-      //PrintToChatAll("Set target %i for r %i", lTarget, GetClientTeam(rocketTeam));
-      //PrintToChatAll("\x06Rocket#%i of team %i --> TT#%i", rocket, rocketTeam, GetClientTeam(lTarget));
-
       GetEntPropVector(lTarget, Prop_Send, "m_vecOrigin", targetPos);
-      //targetPos[2] += 40
 
       distance = CalcDistance(Launches[i], rocketPos, targetPos);
-      PrintToChatAll("b:%f", targetPos[2]);
-      targetPos[2] = GetZFix(distance);
-      PrintToChatAll("a:%f", targetPos[2]);
-      PrintToChatAll("\x06Distance:\x01 %f%%, fixed: %f", distance, targetPos[2]);
+      distance = GetZFix(distance);
+      targetPos[2] += distance;
 
       //PrintToChatAll("Pos: R:%fx %fy %fz, T:%fx %fy %fz",rocketPos[0],rocketPos[1],rocketPos[2],targetPos[0],targetPos[1],targetPos[2]);
 
@@ -305,12 +298,7 @@ public OnGameFrame()
       TeleportEntity(rocket, NULL_VECTOR, ang, nRocketVec);
       }
   }
-}
-
-public LockTarget(client)
-{
-  target = GetClientAimTarget(client, false)
-  PrintToChat(client, "\x05Locked\x01 @ %d", target);
+  return Plugin_Continue;
 }
 
 public SpawnRocket(client)
