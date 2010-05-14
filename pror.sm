@@ -4,21 +4,18 @@
 #include <sdktools>
 #include <sdkhooks>
 
-#define WEAPONID_PLAYER 0
-#define WEAPONID_ROCKET 22
-#define WEAPONID_FLARE 57
-
+#define MAXROCKETS 32
 #define MAXTURNRATIO 0.5
 #define MINTURNRATIO 0.05
 #define ROCKETSPEED 700.0
 
-new Rockets[32];
-new Targets[32];
-new Launches[32][3];
-//new LastVictim;
-//new LastKiller;
-new g_BeamSprite;
-new g_HaloSprite;
+new Rockets[MAXROCKETS];
+new Targets[MAXROCKETS]
+new Launches[MAXROCKETS][3]
+//new LastVictim
+//new LastKiller
+new g_BeamSprite
+new g_HaloSprite
 
 //=======================================
 // Init && Hooks
@@ -26,22 +23,34 @@ new g_HaloSprite;
 
 public OnPluginStart()
 {
-  g_BeamSprite = PrecacheModel("materials/sprites/laser.vmt");
-  g_HaloSprite = PrecacheModel("materials/sprites/halo01.vmt");
+  g_BeamSprite = PrecacheModel("materials/sprites/laser.vmt")
+  g_HaloSprite = PrecacheModel("materials/sprites/halo01.vmt")
   RegConsoleCmd("sm_rocket", Command_Rocket)
+  RegConsoleCmd("dbs", Command_Parse)
 
-  //RegConsoleCmd("sm_lock", Command_Lockon)
-  //HookEvent("object_deflected", Event_ObjectDeflected)
 	HookEvent("player_death", Event_PlayerDeath, EventHookMode_Pre)
 	HookEvent("player_changeclass", Event_PlayerClass, EventHookMode_Pre)
 
   CreateTimer(0.1, RocketThink, _, TIMER_REPEAT)
   
-	for(new i = 0; i < 32; i++)
+	for(new i = 0; i < MAXROCKETS; i++)
 	{
     Rockets[i] = -1
   }
 
+}
+
+public Action:Command_Parse(client, args)
+{
+  PrintToChatAll("Searching")
+  new dballs
+  new ent = -1
+   while ((ent = FindEntityByClassname(ent, "fa_dodgeball_spawner")) != -1)
+    {
+      dballs = GetEntData(ent, FindSendPropInfo("fa_dodgeball_spawner", "m_iMaxDodgeBalls"))
+      PrintToChatAll("\x04Found\x01: %i", dballs)
+    // m_iMaxDodgeBalls
+    }
 }
 
 public Action:Command_Rocket(client, args)
@@ -49,48 +58,29 @@ public Action:Command_Rocket(client, args)
   SpawnRocket(client)
 }
 
-stock Event_ObjectDeflected(Handle:event, const String:name[], bool:dontBroadcast)
-{
-	//new client = GetClientOfUserId(GetEventInt(event, "userid"));
-	//new owner = GetClientOfUserId(GetEventInt(event, "ownerid"));
-  //PrintToChatAll("\x04In-Hook, Owner:%d User:%d", owner, client);
-	switch(GetEventInt(event, "weaponid"))
-	{
-		case WEAPONID_PLAYER:
-        PrintToChatAll("\x04Deflect\x01: Player");
-		case WEAPONID_FLARE:
-		{
-        PrintToChatAll("\x04Deflect\x01: Flare");
-		}
-		case WEAPONID_ROCKET:
-		{
-        PrintToChatAll("\x04Deflect\x01: Rocket");
-		}
-	}
-}
-
 public Action:Event_PlayerDeath(Handle:event, const String:name[], bool:dontBroadcast)
 {
-  decl String:sWeapon[32];
-  new wId;
-  GetEventString(event, "weapon", sWeapon, 32);
+  //make explosion appear as crocket
+  decl String:sWeapon[32]
+  new wId
+  GetEventString(event, "weapon", sWeapon, 32)
   if (StrEqual("env_explosion", sWeapon))
   {
     sWeapon = "deflect_rocket"
     wId = 22
-    SetEventString(event, "weapon", sWeapon);
-    SetEventInt(event, "weaponid", wId);
+    SetEventString(event, "weapon", sWeapon)
+    SetEventInt(event, "weaponid", wId)
   }
-	return Plugin_Continue;
+	return Plugin_Continue
 }
 
 public Action:Event_PlayerClass(Handle:event, const String:name[], bool:dontBroadcast)
 {
-	new client = GetClientOfUserId(GetEventInt(event, "userid"));
-  TF2_SetPlayerClass(client, TFClassType:TFClass_Pyro, false, true);
-	PrintToChat(client, "Only Pyros are allowed.");
-	TF2_RespawnPlayer(client);
-	return Plugin_Continue;
+	new client = GetClientOfUserId(GetEventInt(event, "userid"))
+  TF2_SetPlayerClass(client, TFClassType:TFClass_Pyro, false, true)
+	PrintToChat(client, "Pyro-only game mode!")
+	TF2_RespawnPlayer(client)
+	return Plugin_Continue          //???
 }
 
 //=======================================
@@ -99,26 +89,26 @@ public Action:Event_PlayerClass(Handle:event, const String:name[], bool:dontBroa
 
 public RandomPlayer(destTeam)
 {
-  new player;
-  new team = 0;
-  new maxTries = 256;
+  // this function sux. TODO: rewrite
+  new player
+  new team = 0
+  new maxTries = 256
   while ((team != destTeam) && (maxTries > 0))
     {
-    player = GetRandomInt(1, MaxClients);
+    player = GetRandomInt(1, MaxClients)
     if (IsValidEntity(player) && IsClientInGame(player) && IsPlayerAlive(player))
-      team = GetClientTeam(player);
-    maxTries--;
+      team = GetClientTeam(player)
+    maxTries--
     }
-  //PrintToChatAll("\x03Random\x01: chose id:%d(t#%d)", player, team);
-  return player;
+  return player
 }
 
 public GetOppositeTeam(team)
 {
 if (team == 2)
-  return 3;
+  return 3
 else
-  return 2;
+  return 2
 }
 
 public GiveAmmo()
@@ -126,28 +116,28 @@ public GiveAmmo()
   for (new i = 1; i < 24; i++)
   {
     if (IsValidEntity(i) && IsClientInGame(i) && IsPlayerAlive(i))
-      SetEntData(i,FindSendPropInfo("CTFPlayer", "m_iAmmo") + 4, 200);
-      //SetEntData(i,FindSendPropInfo("CTFPlayer", "m_iAmmo") + 8, 0);
+      SetEntData(i,FindSendPropInfo("CTFPlayer", "m_iAmmo") + 4, 200)
+      //SetEntData(i,FindSendPropInfo("CTFPlayer", "m_iAmmo") + 8, 0)
   }
 }
 
 public SaveRocket(ent)
 {
-  new index;
-  for(new i = 0; i < 32; i++)
+  new index
+  for(new i = 0; i < MAXROCKETS; i++)
 	{
-    index = EntRefToEntIndex(Rockets[i]);
+    index = EntRefToEntIndex(Rockets[i])
     if (index == -1)
       {
-        Rockets[i] = EntIndexToEntRef(ent);
-        return;
+        Rockets[i] = EntIndexToEntRef(ent)
+        return
       }
   }
 }
 
 public UpdateTarget(rocket, player)
 {
-	for(new i = 0; i < 32; i++)
+	for(new i = 0; i < MAXROCKETS; i++)
 	{
     if (EntIndexToEntRef(rocket) == Rockets[i])
       Targets[i] = player
@@ -156,7 +146,7 @@ public UpdateTarget(rocket, player)
 
 public UpdateLaunch(rocket, const Float:launchplace[3])
 {
-	for(new i = 0; i < 32; i++)
+	for(new i = 0; i < MAXROCKETS; i++)
 	{
     if (EntIndexToEntRef(rocket) == Rockets[i])
       Launches[i] = launchplace
@@ -168,47 +158,45 @@ public lim(const Float:val, const Float:limVal)
   if (FloatAbs(val) > limVal)
     {
     if (val < 0)
-      return -1 * limVal;
+      return -1 * limVal
     else
-      return limVal;
+      return limVal
     }
   else
-    return val;
+    return val
 }
 
 public LimitVector(const Float:vec[3], const Float:factor, Float:result[3])
 {
-	result[0] = lim(vec[0], factor);
-	result[1] = lim(vec[1], factor);
-	result[2] = lim(vec[2], factor);
+	result[0] = lim(vec[0], factor)
+	result[1] = lim(vec[1], factor)
+	result[2] = lim(vec[2], factor)
 }
 
 public LimitVectorVector(const Float:vec[3], const Float:factors[3], Float:result[3])
 {
-	result[0] = lim(vec[0], factors[0]);
-	result[1] = lim(vec[1], factors[1]);
-	result[2] = lim(vec[2], factors[2]);
+	result[0] = lim(vec[0], factors[0])
+	result[1] = lim(vec[1], factors[1])
+	result[2] = lim(vec[2], factors[2])
 }
 
 public CalcDistance(const Float:launchPos[3], const Float:currPos[3], const Float:targetPos[3])
 {
-  new Float:currVec[3];
-  new Float:srcVec[3];
-  MakeVectorFromPoints(currPos, targetPos, currVec);
-  MakeVectorFromPoints(launchPos, targetPos, srcVec);
+  new Float:currVec[3]
+  new Float:srcVec[3]
+  MakeVectorFromPoints(currPos, targetPos, currVec)
+  MakeVectorFromPoints(launchPos, targetPos, srcVec)
   srcVec[2] = currVec[2] = 0.0
   return lim((GetVectorLength(currVec) / GetVectorLength(srcVec)) * 100.0, 99.0)
 }
 
 public GetZFix(const Float:dist)
 {
-//return 40;
+//return 40
 if ((dist > 90.0) || (dist < 60.0))
-  return 50.0;
+  return 40.0
 else
-  PrintToChatAll("%f", ((0.00567 * dist * dist * dist) + (-1.374 * dist * dist) + (103.25 * dist) - 2234.65));
-  return 100.0 + 2*((0.00567 * dist * dist * dist) + (-1.374 * dist * dist) + (103.25 * dist) - 2234.65);
-  //return ((-0.0013 * dist * dist * dist) + (0.086 * dist * dist) + (3.1441 * dist) + 10)
+  return 100.0 + 2*((0.00567 * dist * dist * dist) + (-1.374 * dist * dist) + (103.25 * dist) - 2234.65)
 }
 
 //=======================================
@@ -217,34 +205,34 @@ else
 
 public Action:RocketThink(Handle:timer)
 {
-  //PrintToChatAll("Rocket::Think");
-  new Float:ang[3];
-  new Float:vec[3];
-  new Float:vel[3];
-  new Float:srcVelocity;
-  new Float:rocketPos[3];
-  new Float:targetPos[3];
-  new Float:nTargetVec[3];
-  new Float:nRocketVec[3];
-  new Float:fixVec[3];
-  new Float:nFixVec[3];
+  //PrintToChatAll("Rocket::Think")
+  new Float:ang[3]
+  new Float:vec[3]
+  new Float:vel[3]
+  new Float:srcVelocity
+  new Float:rocketPos[3]
+  new Float:targetPos[3]
+  new Float:nTargetVec[3]
+  new Float:nRocketVec[3]
+  new Float:fixVec[3]
+  new Float:nFixVec[3]
 
-  new Float:distance;
-  new rocket;
-  new lTarget;
-  new rocketTeam;
+  new Float:distance
+  new rocket
+  new lTarget
+  new rocketTeam
   
-  GiveAmmo();
+  GiveAmmo()
   
-	for(new i = 0; i < 32; i++)
+	for(new i = 0; i < MAXROCKETS; i++)
 	{
-    rocket = EntRefToEntIndex(Rockets[i]);
+    rocket = EntRefToEntIndex(Rockets[i])
     if (rocket != -1)
       {
-      //PrintToChatAll("Rocket%i::Think", i);
-      GetEntPropVector(rocket, Prop_Send, "m_vecOrigin", rocketPos);
+      //PrintToChatAll("Rocket%i::Think", i)
+      GetEntPropVector(rocket, Prop_Send, "m_vecOrigin", rocketPos)
 
-      GetEntPropVector(rocket, Prop_Data, "m_vecVelocity", vel);  // вектор скорости ракеты
+      GetEntPropVector(rocket, Prop_Data, "m_vecVelocity", vel)  // вектор скорости ракеты
       srcVelocity = GetVectorLength(vel) // модуль скорости ракеты
 
       lTarget = Targets[i]
@@ -253,100 +241,99 @@ public Action:RocketThink(Handle:timer)
         {
         if (lTarget==0)
           {
-          PrintToChatAll("\x04No target");
-          lTarget = RandomPlayer(GetOppositeTeam(rocketTeam));
+          PrintToChatAll("\x04No target")
+          lTarget = RandomPlayer(GetOppositeTeam(rocketTeam))
           Targets[i] = lTarget
           }
         }
-      if (rocketTeam == GetClientTeam(lTarget))
+      if (rocketTeam == GetClientTeam(lTarget)) // rocket just got deflected, choosing new target
       {
-        //PrintToChatAll("Friendly target");
-        //PrintToChatAll("\x05Deflected, saving pos %f %f %f", rocketPos[0], rocketPos[1], rocketPos[2]);
-        Launches[i] = rocketPos;
-        lTarget = RandomPlayer(GetOppositeTeam(rocketTeam));
+        //PrintToChatAll("Friendly target")
+        //PrintToChatAll("\x05Deflected, saving pos %f %f %f", rocketPos[0], rocketPos[1], rocketPos[2])
+        Launches[i] = rocketPos
+        lTarget = RandomPlayer(GetOppositeTeam(rocketTeam))
         Targets[i] = lTarget
       }
 
-      GetEntPropVector(lTarget, Prop_Send, "m_vecOrigin", targetPos);
+      GetEntPropVector(lTarget, Prop_Send, "m_vecOrigin", targetPos)
 
-      distance = CalcDistance(Launches[i], rocketPos, targetPos);
-      distance = GetZFix(distance);
-      targetPos[2] += distance;
+      distance = CalcDistance(Launches[i], rocketPos, targetPos)
+      distance = GetZFix(distance)  // don't want a new variable.
+      targetPos[2] += distance
 
-      //PrintToChatAll("Pos: R:%fx %fy %fz, T:%fx %fy %fz",rocketPos[0],rocketPos[1],rocketPos[2],targetPos[0],targetPos[1],targetPos[2]);
 
       MakeVectorFromPoints(rocketPos, targetPos, nTargetVec) //вектор на цель
-      //MakeVectorFromPoints(targetPos, rocketPos, nTargetVec)
-      NormalizeVector(nTargetVec, nTargetVec); //нормализаци€ вектора на цель
-      NormalizeVector(vel, nRocketVec); //нормализаци€ вектора скорости
+      NormalizeVector(nTargetVec, nTargetVec) //нормализаци€ вектора на цель
+      NormalizeVector(vel, nRocketVec) //нормализаци€ вектора скорости
       
-      SubtractVectors(nTargetVec, nRocketVec, fixVec); //фикс = цель - скорость ракеты
+      SubtractVectors(nTargetVec, nRocketVec, fixVec) //фикс = цель - скорость ракеты
       if (GetVectorLength(fixVec) < MINTURNRATIO)
-          continue;
-      //PrintToChatAll("V:%f FVec: %fx %fy %fz",GetVectorLength(fixVec), fixVec[0],fixVec[1],fixVec[2]);
-      NormalizeVector(fixVec, nFixVec); //нормализаци€ фикса
-      //PrintToChatAll("FVec: %fx %fy %fz", fixVec[0],fixVec[1],fixVec[2]);
-      LimitVector(fixVec, MAXTURNRATIO, nFixVec);
-      ///PrintToChatAll("Lim FVec: %fx %fy %fz",nFixVec[0],nFixVec[1],nFixVec[2]);
-      ///PrintToChatAll("------");
+          continue
+      NormalizeVector(fixVec, nFixVec) //нормализаци€ фикса
+      LimitVector(fixVec, MAXTURNRATIO, nFixVec)
 
-      AddVectors(nRocketVec, nFixVec, nRocketVec); //н—корость = н—корость + н‘икс
-      NormalizeVector(nRocketVec, nRocketVec); //нормализаци€ результата
+      AddVectors(nRocketVec, nFixVec, nRocketVec) //н—корость = н—корость + н‘икс
+      NormalizeVector(nRocketVec, nRocketVec) //нормализаци€ результата
       ScaleVector(nRocketVec, srcVelocity) //домножение на скорость
-      GetVectorAngles(nRocketVec, ang); //определение угла
-      //TeleportEntity(rocket, NULL_VECTOR, ang, ang);
-      TeleportEntity(rocket, NULL_VECTOR, ang, nRocketVec);
+      GetVectorAngles(nRocketVec, ang) //определение угла
+      TeleportEntity(rocket, NULL_VECTOR, ang, nRocketVec)
       }
   }
-  return Plugin_Continue;
+  return Plugin_Continue
 }
 
 public SpawnRocket(client)
 {
-  new ent_rocket
   new Float:ori[3]
   new Float:ang[3]
-  new Float:vec[3]
 
   GetClientEyeAngles(client, ang)
   GetClientEyePosition(client, ori)
 
+  SpawnRocketEx(client, ori, ang)
+}
+
+
+public SpawnRocketEx(const Owner, const Float:position[3], const Float:direction[3])
+{
+  new ent_rocket
+  new Float:vec[3]
+
   ent_rocket = CreateEntityByName("tf_projectile_rocket")
 
-  SetEntDataEnt2(ent_rocket, FindSendPropInfo("CTFProjectile_Rocket", "m_hOwnerEntity"), client, true)
+  SetEntDataEnt2(ent_rocket, FindSendPropInfo("CTFProjectile_Rocket", "m_hOwnerEntity"), Owner, true)
   SetEntData(ent_rocket, FindSendPropInfo("CTFProjectile_Rocket", "m_bCritical"), 1, 1, true)
-  SetEntData(ent_rocket, FindSendPropInfo("CTFProjectile_Rocket", "m_iTeamNum"), GetClientTeam(client), true)
-  SetEntDataVector(ent_rocket, FindSendPropInfo("CTFProjectile_Rocket", "m_angRotation"), ang, true)
+  SetEntData(ent_rocket, FindSendPropInfo("CTFProjectile_Rocket", "m_iTeamNum"), GetClientTeam(Owner), true)
+  SetEntDataVector(ent_rocket, FindSendPropInfo("CTFProjectile_Rocket", "m_angRotation"), direction, true)
   DispatchSpawn(ent_rocket)
 
-  GetAngleVectors(ang, vec, NULL_VECTOR, NULL_VECTOR)
+  GetAngleVectors(direction, vec, NULL_VECTOR, NULL_VECTOR)
   ScaleVector(vec, ROCKETSPEED)
-  TeleportEntity(ent_rocket, ori, NULL_VECTOR, vec)
+  TeleportEntity(ent_rocket, position, NULL_VECTOR, vec)
 
   SDKHook(ent_rocket, SDKHook_StartTouch, Event_StartTouch)
-  //PrintToChat(client, "\x02Hooked!\x01");
-  
-  //Rocket = ent_rocket
+
   SaveRocket(ent_rocket)
 }
 
 public Event_StartTouch(entity, other)
 {
-  //PrintToChat(1, "\x02Got it!\x01");
-  SDKUnhook(entity, SDKHook_StartTouch, Event_StartTouch);
+  new Float:pos[3]
+  new owner
 
-  UpdateTarget(entity, 0);
+  //PrintToChat(1, "\x02Got it!\x01")
+  SDKUnhook(entity, SDKHook_StartTouch, Event_StartTouch)
+
+  UpdateTarget(entity, 0)
   UpdateLaunch(entity, {0,0,0})
 
-  new Float:pos[3]
-  new client
   GetEntDataVector(entity, FindSendPropInfo("CPhysicsProp", "m_vecOrigin"), pos)
-  client = GetEntDataEnt2(entity, FindSendPropInfo("CPhysicsProp", "m_hOwnerEntity"))
-  CreateExplosion(client, pos)
-  //AcceptEntityInput(entity, "Explode", -1, -1, 0);
+  owner = GetEntDataEnt2(entity, FindSendPropInfo("CPhysicsProp", "m_hOwnerEntity"))
+  CreateExplosion(owner, pos)
+  //AcceptEntityInput(entity, "Explode", -1, -1, 0)
 }
 
-public CreateExplosion(client, Float:pos[3])
+public CreateExplosion(owner, Float:pos[3])
 {
   new ent = CreateEntityByName("env_explosion")
 
@@ -354,16 +341,15 @@ public CreateExplosion(client, Float:pos[3])
 
   SetEntProp(ent, Prop_Data, "m_iMagnitude", 180, 4)
   SetEntProp(ent, Prop_Data, "m_iRadiusOverride", 100, 4)
-  SetEntPropEnt(ent, Prop_Data, "m_hOwnerEntity", client) //Set the owner of the explosion
+  SetEntPropEnt(ent, Prop_Data, "m_hOwnerEntity", owner) //Set the owner of the explosion
 
   DispatchSpawn(ent)
   TeleportEntity(ent, pos, NULL_VECTOR, NULL_VECTOR)
   
-  //pos[2] += 2
-  TE_SetupBeamRingPoint(pos, 200.0, 100, g_BeamSprite, g_HaloSprite, 0, 15, 0.5, 5.0, 0.0, {128, 128, 128, 255}, 10, 0);
-  TE_SendToAll();
-  TE_SetupBeamRingPoint(pos, 200.0, 100, g_BeamSprite, g_HaloSprite, 0, 10, 0.6, 10.0, 0.5, {75, 255, 75, 255}, 10, 0);
-  TE_SendToAll();
+  TE_SetupBeamRingPoint(pos, 200.0, 100, g_BeamSprite, g_HaloSprite, 0, 15, 0.5, 5.0, 0.0, {128, 128, 128, 255}, 10, 0)
+  TE_SendToAll()
+  TE_SetupBeamRingPoint(pos, 200.0, 100, g_BeamSprite, g_HaloSprite, 0, 10, 0.6, 10.0, 0.5, {75, 255, 75, 255}, 10, 0)
+  TE_SendToAll()
 
   //AcceptEntityInput(ent, "Explode", -1, -1, 0)
 }
