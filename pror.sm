@@ -8,13 +8,27 @@
 #define MINTURNRATIO 0.05
 #define ROCKETSPEED 700.0
 
+//=======================================
+// Globals
+//=======================================
+
 new Rockets[MAXROCKETS];
 new Targets[MAXROCKETS]
 new Launches[MAXROCKETS][3]
-//new LastVictim
-//new LastKiller
+new LastVictim
+new LastKiller
 new g_BeamSprite
 new g_HaloSprite
+
+// Game rules
+new Float:db_spawner[3]
+new Integer:db_maxRockets
+new Integer:db_minRockets
+new Float:db_accel
+new Integer:db_damage
+new Float:db_baseSpeed
+new Float:db_minDelay
+new Integer:db_activeRockets
 
 //=======================================
 // Init && Hooks
@@ -31,6 +45,9 @@ public OnPluginStart()
 	HookEvent("player_changeclass", Event_PlayerClass, EventHookMode_Pre)
 
   CreateTimer(0.1, RocketThink, _, TIMER_REPEAT)
+  CreateTimer(0.2, SpawnerThink, _, TIMER_REPEAT)
+
+  InitGameRules()
   
 	for(new i = 0; i < MAXROCKETS; i++)
 	{
@@ -41,15 +58,8 @@ public OnPluginStart()
 
 public Action:Command_Parse(client, args)
 {
-  PrintToChatAll("Searching")
-  new dballs
-  new ent = -1
-   while ((ent = FindEntityByClassname(ent, "fa_dodgeball_spawner")) != -1)
-    {
-      dballs = GetEntData(ent, FindSendPropInfo("fa_dodgeball_spawner", "m_iMaxDodgeBalls"))
-      PrintToChatAll("\x04Found\x01: %i", dballs)
-    // m_iMaxDodgeBalls
-    }
+  GetSpawnerPos()
+  GetEntPropVector(client, Prop_Send, "m_vecOrigin", db_spawner)
 }
 
 public Action:Command_Rocket(client, args)
@@ -59,6 +69,9 @@ public Action:Command_Rocket(client, args)
 
 public Action:Event_PlayerDeath(Handle:event, const String:name[], bool:dontBroadcast)
 {
+  LastVictim = GetEventInt(event, "userid")
+  LastKiller = GetEventInt(event, "attacker")
+
   //make explosion appear as crocket
   decl String:sWeapon[32]
   new wId
@@ -202,6 +215,51 @@ else
 // Rocket processing
 //=======================================
 
+stock GetSpawnerPos()
+{
+  new Float:bluResp[3]
+  new Float:redResp[3]
+  new Float:respPos[3]
+  new resp = -1
+  new Integer:team = 1
+  new Integer:prevteam = -1
+  while ((resp = FindEntityByClassname(resp, "info_player_teamspawn")) != -1)
+  {
+    GetEntProp(resp, Prop_Send, "m_iTeamNum", team)
+
+    //team = GetEntData(resp, FindSendPropInfo("info_player_teamspawn", "m_iTeamNum"))
+    //dballs = GetEntData(ent, FindSendPropInfo("fa_dodgeball_spawner", "m_iMaxDodgeBalls"))
+    PrintToChatAll("\x04Found resp of\x01: %i", team)
+  // m_iMaxDodgeBalls
+  }
+}
+
+public InitGameRules()
+{
+  db_spawner = {0,0,0}
+  db_maxRockets = 4
+  db_minRockets = 1
+  db_accel = 1.1
+  db_damage = 100
+  db_baseSpeed = 600.0
+  db_minDelay = 5.0
+  db_activeRockets = 0
+  LastVictim = RandomPlayer(2)
+  LastKiller = RandomPlayer(3)
+}
+
+public Action:SpawnerThink(Handle:timer)
+{
+  if (db_spawner[0] == 0)
+    return Plugin_Continue
+  if (db_activeRockets < db_minRockets)
+    {
+    PrintToChatAll("Trying, %i/%i", db_activeRockets, db_minRockets)
+    SpawnRocketEx(LastVictim, db_spawner, {0.0,-89.0,0.0})
+    }
+  return Plugin_Continue
+}
+
 public Action:RocketThink(Handle:timer)
 {
   //PrintToChatAll("Rocket::Think")
@@ -215,6 +273,8 @@ public Action:RocketThink(Handle:timer)
   new Float:nRocketVec[3]
   new Float:fixVec[3]
   new Float:nFixVec[3]
+  
+  new Integer:rocketCounter = 0
 
   new Float:distance
   new rocket
@@ -228,6 +288,7 @@ public Action:RocketThink(Handle:timer)
     rocket = EntRefToEntIndex(Rockets[i])
     if (rocket != -1)
       {
+      rocketCounter++
       //PrintToChatAll("Rocket%i::Think", i)
       GetEntPropVector(rocket, Prop_Send, "m_vecOrigin", rocketPos)
 
@@ -252,6 +313,7 @@ public Action:RocketThink(Handle:timer)
         Launches[i] = rocketPos
         lTarget = RandomPlayer(GetOppositeTeam(rocketTeam))
         Targets[i] = lTarget
+        srcVelocity *= db_accel
       }
 
       GetEntPropVector(lTarget, Prop_Send, "m_vecOrigin", targetPos)
@@ -278,6 +340,11 @@ public Action:RocketThink(Handle:timer)
       TeleportEntity(rocket, NULL_VECTOR, ang, nRocketVec)
       }
   }
+  if (rocketCounter != db_activeRockets)
+    {
+    PrintToChatAll("\x05Wrong rocket count! Actual: %i, stored: %i", rocketCounter, db_activeRockets)
+    db_activeRockets = rocketCounter
+    }
   return Plugin_Continue
 }
 
@@ -307,12 +374,13 @@ public SpawnRocketEx(const Owner, const Float:position[3], const Float:direction
   DispatchSpawn(ent_rocket)
 
   GetAngleVectors(direction, vec, NULL_VECTOR, NULL_VECTOR)
-  ScaleVector(vec, ROCKETSPEED)
+  ScaleVector(vec, db_baseSpeed)
   TeleportEntity(ent_rocket, position, NULL_VECTOR, vec)
 
   SDKHook(ent_rocket, SDKHook_StartTouch, Event_StartTouch)
 
   SaveRocket(ent_rocket)
+  db_activeRockets++
 }
 
 public Event_StartTouch(entity, other)
@@ -322,6 +390,7 @@ public Event_StartTouch(entity, other)
 
   //PrintToChat(1, "\x02Got it!\x01")
   SDKUnhook(entity, SDKHook_StartTouch, Event_StartTouch)
+  db_activeRockets--
 
   UpdateTarget(entity, 0)
   UpdateLaunch(entity, {0,0,0})
@@ -336,9 +405,9 @@ public CreateExplosion(owner, Float:pos[3])
 {
   new ent = CreateEntityByName("env_explosion")
 
-  DispatchKeyValueFloat(ent, "DamageForce", 180.0)
+  //DispatchKeyValueFloat(ent, "DamageForce", db_damage)
 
-  SetEntProp(ent, Prop_Data, "m_iMagnitude", 180, 4)
+  SetEntProp(ent, Prop_Data, "m_iMagnitude", db_damage, 4)
   SetEntProp(ent, Prop_Data, "m_iRadiusOverride", 100, 4)
   SetEntPropEnt(ent, Prop_Data, "m_hOwnerEntity", owner) //Set the owner of the explosion
 
@@ -350,5 +419,5 @@ public CreateExplosion(owner, Float:pos[3])
   TE_SetupBeamRingPoint(pos, 200.0, 100, g_BeamSprite, g_HaloSprite, 0, 10, 0.6, 10.0, 0.5, {75, 255, 75, 255}, 10, 0)
   TE_SendToAll()
 
-  //AcceptEntityInput(ent, "Explode", -1, -1, 0)
+  AcceptEntityInput(ent, "Explode", -1, -1, 0)
 }
