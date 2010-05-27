@@ -6,15 +6,14 @@
 #define MAXROCKETS 32
 #define MAXTURNRATIO 0.5
 #define MINTURNRATIO 0.05
-#define ROCKETSPEED 700.0
 
 //=======================================
 // Globals
 //=======================================
 
-new Rockets[MAXROCKETS];
+new Rockets[MAXROCKETS]
 new Targets[MAXROCKETS]
-new Launches[MAXROCKETS][3]
+new Float:Launches[MAXROCKETS][3]
 new LastVictim
 new LastKiller
 new g_BeamSprite
@@ -23,12 +22,17 @@ new g_HaloSprite
 // Game rules
 new Float:db_spawner[3]
 new Integer:db_maxRockets
-new Integer:db_minRockets
 new Float:db_accel
 new Integer:db_damage
 new Float:db_baseSpeed
 new Float:db_minDelay
 new Integer:db_activeRockets
+
+//CVars Handles
+new Handle:g_h_sm_dodgeball_basedamage
+new Handle:g_h_sm_dodgeball_maxrockets
+new Handle:g_h_sm_dodgeball_reflectinc
+new Handle:g_h_sm_dodgeball_speedmul
 
 //=======================================
 // Init && Hooks
@@ -48,11 +52,10 @@ public OnPluginStart()
   CreateTimer(0.2, SpawnerThink, _, TIMER_REPEAT)
 
   InitGameRules()
+  InitCvars()
   
   for(new i = 0; i < MAXROCKETS; i++)
-  {
     Rockets[i] = -1
-  }
 
 }
 
@@ -93,6 +96,42 @@ public Action:Event_PlayerClass(Handle:event, const String:name[], bool:dontBroa
   PrintToChat(client, "Pyro-only game mode!")
   TF2_RespawnPlayer(client)
   return Plugin_Continue          //???
+}
+
+//=======================================
+// Cvars
+//=======================================
+
+public InitCvars()
+{
+  g_h_sm_dodgeball_basedamage = CreateConVar("sm_dodgeball_basedamage", "100", "Base rocket explosion damage")
+  HookConVarChange(g_h_sm_dodgeball_basedamage, OnBaseDamageChange)
+  g_h_sm_dodgeball_speedmul = CreateConVar("sm_dodgeball_speedmul", "0.5", "Speed multiplier to base speed of 1100")
+  HookConVarChange(g_h_sm_dodgeball_speedmul, OnSpeedMulChange)
+  g_h_sm_dodgeball_maxrockets = CreateConVar("sm_dodgeball_maxrockets", "3", "Max rockets existing at the same time")
+  HookConVarChange(g_h_sm_dodgeball_maxrockets, OnMaxRocketsChange)
+  g_h_sm_dodgeball_reflectinc = CreateConVar("sm_dodgeball_reflectinc", "0.1", "Speed increment on deflection")
+  HookConVarChange(g_h_sm_dodgeball_reflectinc, OnDeflectIncChange)
+}
+
+public OnBaseDamageChange(Handle:cvar, const String:oldVal[], const String:newVal[])
+{
+  db_damage = StringToInt(newVal)
+}
+
+public OnMaxRocketsChange(Handle:cvar, const String:oldVal[], const String:newVal[])
+{
+  db_maxRockets = StringToInt(newVal)
+}
+
+public OnDeflectIncChange(Handle:cvar, const String:oldVal[], const String:newVal[])
+{
+  db_accel = StringToFloat(newVal)
+}
+
+public OnSpeedMulChange(Handle:cvar, const String:oldVal[], const String:newVal[])
+{
+  db_baseSpeed = 1100 * StringToFloat(newVal)
 }
 
 //=======================================
@@ -170,7 +209,7 @@ public lim(const Float:val, const Float:limVal)
   if (FloatAbs(val) > limVal)
     {
     if (val < 0)
-      return -1 * limVal
+      return (-1 * limVal)
     else
       return limVal
     }
@@ -207,7 +246,7 @@ public GetZFix(const Float:dist)
 //return 40
 if ((dist > 90.0) || (dist < 60.0))
   return 40.0
-else
+else // HOLY SHIT CRAZY MATHS
   return 100.0 + 2*((0.00567 * dist * dist * dist) + (-1.374 * dist * dist) + (103.25 * dist) - 2234.65)
 }
 
@@ -238,10 +277,9 @@ public InitGameRules()
 {
   db_spawner = {0,0,0}
   db_maxRockets = 4
-  db_minRockets = 1
-  db_accel = 1.1
+  db_accel = 0.1
   db_damage = 100
-  db_baseSpeed = 600.0
+  db_baseSpeed = 600
   db_minDelay = 5.0
   db_activeRockets = 0
   LastVictim = RandomPlayer(2)
@@ -252,9 +290,9 @@ public Action:SpawnerThink(Handle:timer)
 {
   if (db_spawner[0] == 0)
     return Plugin_Continue
-  if (db_activeRockets < db_minRockets)
+  if (db_activeRockets < db_maxRockets)
     {
-    PrintToChatAll("Trying, %i/%i", db_activeRockets, db_minRockets)
+    PrintToChatAll("Trying, %i/%i", db_activeRockets, db_maxRockets)
     SpawnRocketEx(LastVictim, db_spawner, {0.0,-89.0,0.0})
     }
   return Plugin_Continue
@@ -274,7 +312,7 @@ public Action:RocketThink(Handle:timer)
   new Float:fixVec[3]
   new Float:nFixVec[3]
   
-  new Integer:rocketCounter = 0
+  new Integer:rocketCounter = 0       // to check stored value
 
   new Float:distance
   new rocket
@@ -292,13 +330,13 @@ public Action:RocketThink(Handle:timer)
       //PrintToChatAll("Rocket%i::Think", i)
       GetEntPropVector(rocket, Prop_Send, "m_vecOrigin", rocketPos)
 
-      GetEntPropVector(rocket, Prop_Data, "m_vecVelocity", vel)  // вектор скорости ракеты
-      srcVelocity = GetVectorLength(vel) // модуль скорости ракеты
+      GetEntPropVector(rocket, Prop_Data, "m_vecVelocity", vel)
+      srcVelocity = GetVectorLength(vel)        // saving src speed for future use
 
       lTarget = Targets[i]
       rocketTeam = GetEntData(rocket, FindSendPropInfo("CTFProjectile_Rocket", "m_iTeamNum"))
       if (!((lTarget > 0) && IsValidEntity(lTarget) && IsClientInGame(lTarget) && IsPlayerAlive(lTarget)))
-        {
+        {                                       // new rocket?
         if (lTarget==0)
           {
           PrintToChatAll("\x04No target")
@@ -309,41 +347,40 @@ public Action:RocketThink(Handle:timer)
       if (rocketTeam == GetClientTeam(lTarget)) // rocket just got deflected, choosing new target
       {
         //PrintToChatAll("Friendly target")
-        //PrintToChatAll("\x05Deflected, saving pos %f %f %f", rocketPos[0], rocketPos[1], rocketPos[2])
         Launches[i] = rocketPos
         lTarget = RandomPlayer(GetOppositeTeam(rocketTeam))
         Targets[i] = lTarget
-        srcVelocity *= db_accel
+        srcVelocity *= (1 + db_accel)           // applying acceleration
       }
 
       GetEntPropVector(lTarget, Prop_Send, "m_vecOrigin", targetPos)
 
-      distance = CalcDistance(Launches[i], rocketPos, targetPos)
-      distance = GetZFix(distance)  // don't want a new variable.
-      targetPos[2] += distance
+      distance = CalcDistance(Launches[i], rocketPos, targetPos) // percents from launch to target
+      distance = GetZFix(distance)                           // don't want a new variable.
+      targetPos[2] += distance                               // fixing Z-component
 
 
-      MakeVectorFromPoints(rocketPos, targetPos, nTargetVec) //вектор на цель
-      NormalizeVector(nTargetVec, nTargetVec) //нормализация вектора на цель
-      NormalizeVector(vel, nRocketVec) //нормализация вектора скорости
+      MakeVectorFromPoints(rocketPos, targetPos, nTargetVec) // vector to the target
+      NormalizeVector(nTargetVec, nTargetVec)                // target vector normalization
+      NormalizeVector(vel, nRocketVec)                       // speed vector normalization
       
-      SubtractVectors(nTargetVec, nRocketVec, fixVec) //фикс = цель - скорость ракеты
-      if (GetVectorLength(fixVec) < MINTURNRATIO)
+      SubtractVectors(nTargetVec, nRocketVec, fixVec)        // fixV = targetV - velocityV
+      if (GetVectorLength(fixVec) < MINTURNRATIO)            // don't turn if direction is quite accurate
           continue
-      NormalizeVector(fixVec, nFixVec) //нормализация фикса
-      LimitVector(fixVec, MAXTURNRATIO, nFixVec)
+      NormalizeVector(fixVec, nFixVec)                       // fix normalization
+      LimitVector(fixVec, MAXTURNRATIO, nFixVec)             // make it turn no more than allowed
 
-      AddVectors(nRocketVec, nFixVec, nRocketVec) //нСкорость = нСкорость + нФикс
-      NormalizeVector(nRocketVec, nRocketVec) //нормализация результата
-      ScaleVector(nRocketVec, srcVelocity) //домножение на скорость
-      GetVectorAngles(nRocketVec, ang) //определение угла
-      TeleportEntity(rocket, NULL_VECTOR, ang, nRocketVec)
+      AddVectors(nRocketVec, nFixVec, nRocketVec)            // newVel = normVel + normFix
+      NormalizeVector(nRocketVec, nRocketVec)                // making newVel normal
+      ScaleVector(nRocketVec, srcVelocity)                   // and restoring speed
+      GetVectorAngles(nRocketVec, ang)                       // fix rocket rotation
+      TeleportEntity(rocket, NULL_VECTOR, ang, nRocketVec)   // TADA
       }
   }
-  if (rocketCounter != db_activeRockets)
+  if (rocketCounter != db_activeRockets)                     // sanity checks
     {
     PrintToChatAll("\x05Wrong rocket count! Actual: %i, stored: %i", rocketCounter, db_activeRockets)
-    db_activeRockets = rocketCounter
+    db_activeRockets = rocketCounter                         // should never happen
     }
   return Plugin_Continue
 }
