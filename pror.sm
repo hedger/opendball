@@ -41,16 +41,16 @@ public OnPluginStart()
   RegConsoleCmd("sm_rocket", Command_Rocket)
   RegConsoleCmd("dbs", Command_Parse)
 
-	HookEvent("player_death", Event_PlayerDeath, EventHookMode_Pre)
-	HookEvent("player_changeclass", Event_PlayerClass, EventHookMode_Pre)
+  HookEvent("player_death", Event_PlayerDeath, EventHookMode_Pre)
+  HookEvent("player_changeclass", Event_PlayerClass, EventHookMode_Pre)
 
   CreateTimer(0.1, RocketThink, _, TIMER_REPEAT)
   CreateTimer(0.2, SpawnerThink, _, TIMER_REPEAT)
 
   InitGameRules()
   
-	for(new i = 0; i < MAXROCKETS; i++)
-	{
+  for(new i = 0; i < MAXROCKETS; i++)
+  {
     Rockets[i] = -1
   }
 
@@ -83,16 +83,16 @@ public Action:Event_PlayerDeath(Handle:event, const String:name[], bool:dontBroa
     SetEventString(event, "weapon", sWeapon)
     SetEventInt(event, "weaponid", wId)
   }
-	return Plugin_Continue
+  return Plugin_Continue
 }
 
 public Action:Event_PlayerClass(Handle:event, const String:name[], bool:dontBroadcast)
 {
-	new client = GetClientOfUserId(GetEventInt(event, "userid"))
+  new client = GetClientOfUserId(GetEventInt(event, "userid"))
   TF2_SetPlayerClass(client, TFClassType:TFClass_Pyro, false, true)
-	PrintToChat(client, "Pyro-only game mode!")
-	TF2_RespawnPlayer(client)
-	return Plugin_Continue          //???
+  PrintToChat(client, "Pyro-only game mode!")
+  TF2_RespawnPlayer(client)
+  return Plugin_Continue          //???
 }
 
 //=======================================
@@ -137,7 +137,7 @@ public SaveRocket(ent)
 {
   new index
   for(new i = 0; i < MAXROCKETS; i++)
-	{
+  {
     index = EntRefToEntIndex(Rockets[i])
     if (index == -1)
       {
@@ -149,8 +149,8 @@ public SaveRocket(ent)
 
 public UpdateTarget(rocket, player)
 {
-	for(new i = 0; i < MAXROCKETS; i++)
-	{
+  for(new i = 0; i < MAXROCKETS; i++)
+  {
     if (EntIndexToEntRef(rocket) == Rockets[i])
       Targets[i] = player
   }
@@ -158,8 +158,8 @@ public UpdateTarget(rocket, player)
 
 public UpdateLaunch(rocket, const Float:launchplace[3])
 {
-	for(new i = 0; i < MAXROCKETS; i++)
-	{
+  for(new i = 0; i < MAXROCKETS; i++)
+  {
     if (EntIndexToEntRef(rocket) == Rockets[i])
       Launches[i] = launchplace
   }
@@ -180,16 +180,16 @@ public lim(const Float:val, const Float:limVal)
 
 public LimitVector(const Float:vec[3], const Float:factor, Float:result[3])
 {
-	result[0] = lim(vec[0], factor)
-	result[1] = lim(vec[1], factor)
-	result[2] = lim(vec[2], factor)
+  result[0] = lim(vec[0], factor)
+  result[1] = lim(vec[1], factor)
+  result[2] = lim(vec[2], factor)
 }
 
 public LimitVectorVector(const Float:vec[3], const Float:factors[3], Float:result[3])
 {
-	result[0] = lim(vec[0], factors[0])
-	result[1] = lim(vec[1], factors[1])
-	result[2] = lim(vec[2], factors[2])
+  result[0] = lim(vec[0], factors[0])
+  result[1] = lim(vec[1], factors[1])
+  result[2] = lim(vec[2], factors[2])
 }
 
 public CalcDistance(const Float:launchPos[3], const Float:currPos[3], const Float:targetPos[3])
@@ -283,8 +283,8 @@ public Action:RocketThink(Handle:timer)
   
   GiveAmmo()
   
-	for(new i = 0; i < MAXROCKETS; i++)
-	{
+  for(new i = 0; i < MAXROCKETS; i++)
+  {
     rocket = EntRefToEntIndex(Rockets[i])
     if (rocket != -1)
       {
