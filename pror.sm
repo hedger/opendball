@@ -14,7 +14,7 @@
 new Rockets[MAXROCKETS]
 new Targets[MAXROCKETS]
 new Float:Launches[MAXROCKETS][3]
-new Float:LastLaunch
+new LastLaunch
 new LastVictim
 new LastVictimTeam
 //new LastKiller
@@ -299,31 +299,21 @@ public InitGameRules()
   LastVictim = RandomPlayer(2)
   LastVictimTeam = 2
   //LastKiller = RandomPlayer(3)
-  LastLaunch = float(GetTime())
+  LastLaunch = GetTime()
 }
 
 public Action:SpawnerThink(Handle:timer)
 {
-/*  new Float:currtime
-  new Integer:icurrtime
-  new Integer:ts[2]
-  GetTime(ts)
-  //PrintToChatAll("Now: %i, %i", ts[0], ts[1])
-  currtime = 1.4
-  currtime = float(ts[0])+1.4
-  PrintToChatAll("Now: %f/%i", currtime, ts[0])
-  if ((currtime - LastLaunch) < db_minDelay)
-    {
-    PrintToChatAll("Skipping, %f/%f/%f", currtime, LastLaunch, db_minDelay)
+  new currtime = GetTime()
+  if (float(currtime - LastLaunch) < db_minDelay)
     return Plugin_Continue
-    }*/
   if (db_spawner[0] == 0)
     return Plugin_Continue
   if (db_activeRockets < db_maxRockets)
     {
-    PrintToChatAll("Trying, %i/%i", db_activeRockets, db_maxRockets)
+    //PrintToChatAll("Trying, %i/%i", db_activeRockets, db_maxRockets)
     SpawnRocketEx(LastVictim, db_spawner, Float:{89.0,0.0,0.0}, LastVictimTeam)
-    //LastLaunch = currtime
+    LastLaunch = currtime
     }
   return Plugin_Continue
 }
@@ -483,8 +473,6 @@ public CreateExplosion(owner, Float:pos[3])
 
   DispatchSpawn(ent)
   TeleportEntity(ent, pos, NULL_VECTOR, NULL_VECTOR)
-  
-//stock TE_SetupBeamRingPoint(const Float:center[3], Float:Start_Radius, Float:End_Radius, ModelIndex, HaloIndex, StartFrame, FrameRate, Float:Life, Float:Width, Float:Amplitude, const Color[4], Speed, Flags)
 
   pos[2] -= 40.0
   TE_SetupBeamRingPoint(pos, 200.0, 100.0, g_BeamSprite, g_HaloSprite, 0, 15, 0.5, 5.0, 0.0, {128, 128, 128, 255}, 10, 0)
