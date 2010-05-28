@@ -61,8 +61,8 @@ public OnPluginStart()
 
 public Action:Command_Parse(client, args)
 {
-  GetSpawnerPos()
-  GetEntPropVector(client, Prop_Send, "m_vecOrigin", db_spawner)
+  db_spawner = GetSpawnerPos()
+  //GetEntPropVector(client, Prop_Send, "m_vecOrigin", db_spawner)
 }
 
 public Action:Command_Rocket(client, args)
@@ -258,21 +258,21 @@ else // HOLY SHIT CRAZY MATHS
 
 stock GetSpawnerPos()
 {
-  new Float:bluResp[3]
-  new Float:redResp[3]
-  new Float:respPos[3]
+  new Float:currPos[3]
+  new Float:spawnerPos[3]
   new resp = -1
-  new Integer:team = 1
-  new Integer:prevteam = -1
+  new Float:count = 0.0
   while ((resp = FindEntityByClassname(resp, "info_player_teamspawn")) != -1)
   {
-    GetEntProp(resp, Prop_Send, "m_iTeamNum", team)
-
-    //team = GetEntData(resp, FindSendPropInfo("info_player_teamspawn", "m_iTeamNum"))
-    //dballs = GetEntData(ent, FindSendPropInfo("fa_dodgeball_spawner", "m_iMaxDodgeBalls"))
-    PrintToChatAll("\x04Found resp of\x01: %i", team)
-  // m_iMaxDodgeBalls
+    GetEntPropVector(resp, Prop_Send, "m_vecOrigin", currPos)
+    count++
+    spawnerPos[0] += currPos[0]
+    spawnerPos[1] += currPos[1]
   }
+  spawnerPos[0] /= count
+  spawnerPos[1] /= count
+  spawnerPos[2] = currPos[2] + 500
+  return spawnerPos
 }
 
 public InitGameRules()
@@ -436,7 +436,7 @@ public Event_StartTouch(entity, other)
 
   GetEntDataVector(entity, FindSendPropInfo("CPhysicsProp", "m_vecOrigin"), pos)
   owner = GetEntDataEnt2(entity, FindSendPropInfo("CPhysicsProp", "m_hOwnerEntity"))
-  CreateExplosion(owner, pos)
+  // CreateExplosion(owner, pos)
   //AcceptEntityInput(entity, "Explode", -1, -1, 0)
 }
 
@@ -453,6 +453,7 @@ public CreateExplosion(owner, Float:pos[3])
   DispatchSpawn(ent)
   TeleportEntity(ent, pos, NULL_VECTOR, NULL_VECTOR)
   
+  pos[2] -= 40.0
   TE_SetupBeamRingPoint(pos, 200.0, 100, g_BeamSprite, g_HaloSprite, 0, 15, 0.5, 5.0, 0.0, {128, 128, 128, 255}, 10, 0)
   TE_SendToAll()
   TE_SetupBeamRingPoint(pos, 200.0, 100, g_BeamSprite, g_HaloSprite, 0, 10, 0.6, 10.0, 0.5, {75, 255, 75, 255}, 10, 0)
