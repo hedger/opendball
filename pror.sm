@@ -318,6 +318,22 @@ public Action:SpawnerThink(Handle:timer)
   return Plugin_Continue
 }
 
+public Boolean:NewTarget(rocket, bool:SavePos)   //returns False if finding new target failed
+{
+  PrintToChatAll("\x04Finding new target")
+  new target
+  new rocketTeam = GetEntData(rocket, FindSendPropInfo("CTFProjectile_Rocket", "m_iTeamNum"))
+  target = RandomPlayer(GetOppositeTeam(rocketTeam))
+  UpdateTarget(rocket, target)
+  if (SavePos)
+    {
+    new Float:rocketPos[3]
+    GetEntPropVector(rocket, Prop_Send, "m_vecOrigin", rocketPos)
+    UpdateLaunch(rocket, rocketPos)
+    }
+  return Boolean:(target!=-1)
+}
+
 public Action:RocketThink(Handle:timer)
 {
   //PrintToChatAll("Rocket::Think")
@@ -353,26 +369,20 @@ public Action:RocketThink(Handle:timer)
       srcVelocity = GetVectorLength(vel)        // saving src speed for future use
 
       lTarget = Targets[i]
-      if (lTarget == -1)
-        continue
       rocketTeam = GetEntData(rocket, FindSendPropInfo("CTFProjectile_Rocket", "m_iTeamNum"))
-      if (!((lTarget > 0) && IsValidEntity(lTarget) && IsClientInGame(lTarget) && IsPlayerAlive(lTarget)))
-        {                                       // new rocket?
-        if (lTarget==0)
+
+      if ((lTarget > 0) && IsValidEntity(lTarget) && IsClientInGame(lTarget) && IsPlayerAlive(lTarget))
+        {
+        if (rocketTeam == GetClientTeam(lTarget))
           {
-          PrintToChatAll("\x04No target")
-          lTarget = RandomPlayer(GetOppositeTeam(rocketTeam))
-          Targets[i] = lTarget
+          srcVelocity *= (1 + db_accel)           // applying acceleration
+          if (!NewTarget(rocket, true))
+            continue
           }
         }
-      if (rocketTeam == GetClientTeam(lTarget)) // rocket just got deflected, choosing new target
-      {
-        //PrintToChatAll("Friendly target")
-        Launches[i] = rocketPos
-        lTarget = RandomPlayer(GetOppositeTeam(rocketTeam))
-        Targets[i] = lTarget
-        srcVelocity *= (1 + db_accel)           // applying acceleration
-      }
+      else
+        if (!NewTarget(rocket, false))
+          continue
 
       GetEntPropVector(lTarget, Prop_Send, "m_vecOrigin", targetPos)
 
