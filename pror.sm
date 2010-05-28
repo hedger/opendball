@@ -15,6 +15,7 @@ new Rockets[MAXROCKETS]
 new Targets[MAXROCKETS]
 new Float:Launches[MAXROCKETS][3]
 new LastVictim
+new LastVictimTeam
 new LastKiller
 new g_BeamSprite
 new g_HaloSprite
@@ -73,6 +74,8 @@ public Action:Command_Rocket(client, args)
 public Action:Event_PlayerDeath(Handle:event, const String:name[], bool:dontBroadcast)
 {
   LastVictim = GetEventInt(event, "userid")
+  LastVictimTeam = GetClientTeam(LastVictim)
+  PrintToChatAll("Saved for %i -> %i", LastVictim, LastVictimTeam)
   LastKiller = GetEventInt(event, "attacker")
 
   //make explosion appear as crocket
@@ -151,6 +154,8 @@ public RandomPlayer(destTeam)
       team = GetClientTeam(player)
     maxTries--
     }
+  if (maxTries==0)
+    return -1
   return player
 }
 
@@ -295,7 +300,7 @@ public Action:SpawnerThink(Handle:timer)
   if (db_activeRockets < db_maxRockets)
     {
     PrintToChatAll("Trying, %i/%i", db_activeRockets, db_maxRockets)
-    SpawnRocketEx(LastVictim, db_spawner, {0.0,-89.0,0.0})
+    SpawnRocketEx(LastVictim, db_spawner, {89.0,0.0,0.0}, LastVictimTeam)
     }
   return Plugin_Continue
 }
@@ -395,20 +400,23 @@ public SpawnRocket(client)
   GetClientEyeAngles(client, ang)
   GetClientEyePosition(client, ori)
 
-  SpawnRocketEx(client, ori, ang)
+  SpawnRocketEx(client, ori, ang, -1)
 }
 
 
-public SpawnRocketEx(const Owner, const Float:position[3], const Float:direction[3])
+public SpawnRocketEx(const Owner, const Float:position[3], const Float:direction[3], Integer:Team)
 {
   new ent_rocket
   new Float:vec[3]
+
+  if (Team == -1)
+    Team = GetClientTeam(Owner) //this fails on dead players
 
   ent_rocket = CreateEntityByName("tf_projectile_rocket")
 
   SetEntDataEnt2(ent_rocket, FindSendPropInfo("CTFProjectile_Rocket", "m_hOwnerEntity"), Owner, true)
   SetEntData(ent_rocket, FindSendPropInfo("CTFProjectile_Rocket", "m_bCritical"), 1, 1, true)
-  SetEntData(ent_rocket, FindSendPropInfo("CTFProjectile_Rocket", "m_iTeamNum"), GetClientTeam(Owner), true)
+  SetEntData(ent_rocket, FindSendPropInfo("CTFProjectile_Rocket", "m_iTeamNum"), Team, true)
   SetEntDataVector(ent_rocket, FindSendPropInfo("CTFProjectile_Rocket", "m_angRotation"), direction, true)
   DispatchSpawn(ent_rocket)
 
