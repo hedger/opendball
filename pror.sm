@@ -14,6 +14,7 @@
 new Rockets[MAXROCKETS]
 new Targets[MAXROCKETS]
 new Float:Launches[MAXROCKETS][3]
+new Integer:LastLaunch
 new LastVictim
 new LastVictimTeam
 new LastKiller
@@ -26,7 +27,7 @@ new Integer:db_maxRockets
 new Float:db_accel
 new Integer:db_damage
 new Float:db_baseSpeed
-new Float:db_minDelay
+new Integer:db_minDelay
 new Integer:db_activeRockets
 
 //CVars Handles
@@ -287,20 +288,27 @@ public InitGameRules()
   db_accel = 0.1
   db_damage = 100
   db_baseSpeed = 1100 * 0.5
-  db_minDelay = 5.0
+  db_minDelay = 3
   db_activeRockets = 0
   LastVictim = RandomPlayer(2)
+  LastVictimTeam = 2
   LastKiller = RandomPlayer(3)
+  LastLaunch = GetTime()
 }
 
 public Action:SpawnerThink(Handle:timer)
 {
+  new Integer:time
+  time = GetTime()
   if (db_spawner[0] == 0)
+    return Plugin_Continue
+  if ((time - LastLaunch) < db_minDelay)
     return Plugin_Continue
   if (db_activeRockets < db_maxRockets)
     {
     PrintToChatAll("Trying, %i/%i", db_activeRockets, db_maxRockets)
     SpawnRocketEx(LastVictim, db_spawner, {89.0,0.0,0.0}, LastVictimTeam)
+    LastLaunch = time
     }
   return Plugin_Continue
 }
