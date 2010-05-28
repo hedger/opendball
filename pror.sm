@@ -235,6 +235,8 @@ public CalcDistance(const Float:launchPos[3], const Float:currPos[3], const Floa
 {
   new Float:currVec[3]
   new Float:srcVec[3]
+  if (launchPos[0] == 0.0)
+    return 0
   MakeVectorFromPoints(currPos, targetPos, currVec)
   MakeVectorFromPoints(launchPos, targetPos, srcVec)
   srcVec[2] = currVec[2] = 0.0
@@ -279,7 +281,7 @@ public InitGameRules()
   db_maxRockets = 4
   db_accel = 0.1
   db_damage = 100
-  db_baseSpeed = 600
+  db_baseSpeed = 1100 * 0.5
   db_minDelay = 5.0
   db_activeRockets = 0
   LastVictim = RandomPlayer(2)
