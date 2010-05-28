@@ -428,13 +428,16 @@ public SpawnRocket(client)
 }
 
 
-public SpawnRocketEx(const Owner, const Float:position[3], const Float:direction[3], Team)
+public SpawnRocketEx(Owner, const Float:position[3], const Float:direction[3], Team)
 {
   new ent_rocket
   new Float:vec[3]
 
   if (Team == -1)
     Team = GetClientTeam(Owner) //this fails on dead players
+  else
+    if (!(IsValidEntity(Owner))) // && IsClientInGame(Owner) && IsPlayerAlive(Owner)))
+      Owner = RandomPlayer(Team)
 
   ent_rocket = CreateEntityByName("tf_projectile_rocket")
 
@@ -468,7 +471,7 @@ public Event_StartTouch(entity, other)
 
   GetEntDataVector(entity, FindSendPropInfo("CPhysicsProp", "m_vecOrigin"), pos)
   owner = GetEntDataEnt2(entity, FindSendPropInfo("CPhysicsProp", "m_hOwnerEntity"))
-  // CreateExplosion(owner, pos)
+  CreateExplosion(owner, pos)
 }
 
 public CreateExplosion(owner, Float:pos[3])
