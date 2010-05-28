@@ -14,27 +14,28 @@
 new Rockets[MAXROCKETS]
 new Targets[MAXROCKETS]
 new Float:Launches[MAXROCKETS][3]
-new Integer:LastLaunch
+new Float:LastLaunch
 new LastVictim
 new LastVictimTeam
-new LastKiller
+//new LastKiller
 new g_BeamSprite
 new g_HaloSprite
 
 // Game rules
 new Float:db_spawner[3]
-new Integer:db_maxRockets
+new db_maxRockets
 new Float:db_accel
-new Integer:db_damage
+new db_damage
 new Float:db_baseSpeed
-new Integer:db_minDelay
-new Integer:db_activeRockets
+new Float:db_minDelay
+new db_activeRockets
 
 //CVars Handles
 new Handle:g_h_sm_dodgeball_basedamage
 new Handle:g_h_sm_dodgeball_maxrockets
 new Handle:g_h_sm_dodgeball_reflectinc
 new Handle:g_h_sm_dodgeball_speedmul
+new Handle:g_h_sm_dodgeball_spawninterval
 
 //=======================================
 // Init && Hooks
@@ -63,7 +64,7 @@ public OnPluginStart()
 
 public Action:Command_Parse(client, args)
 {
-  db_spawner = GetSpawnerPos()
+  GetSpawnerPos(db_spawner)
   //GetEntPropVector(client, Prop_Send, "m_vecOrigin", db_spawner)
 }
 
@@ -77,7 +78,7 @@ public Action:Event_PlayerDeath(Handle:event, const String:name[], bool:dontBroa
   LastVictim = GetEventInt(event, "userid")
   LastVictimTeam = GetClientTeam(LastVictim)
   PrintToChatAll("Saved for %i -> %i", LastVictim, LastVictimTeam)
-  LastKiller = GetEventInt(event, "attacker")
+  //LastKiller = GetEventInt(event, "attacker")
 
   //make explosion appear as crocket
   decl String:sWeapon[32]
@@ -112,6 +113,8 @@ public InitCvars()
   HookConVarChange(g_h_sm_dodgeball_basedamage, OnBaseDamageChange)
   g_h_sm_dodgeball_speedmul = CreateConVar("sm_dodgeball_speedmul", "0.5", "Speed multiplier to base speed of 1100")
   HookConVarChange(g_h_sm_dodgeball_speedmul, OnSpeedMulChange)
+  g_h_sm_dodgeball_spawninterval = CreateConVar("sm_dodgeball_spawninterval", "3.0", "Speed multiplier to base speed of 1100")
+  HookConVarChange(g_h_sm_dodgeball_spawninterval, OnSpawnIntervalChange)
   g_h_sm_dodgeball_maxrockets = CreateConVar("sm_dodgeball_maxrockets", "3", "Max rockets existing at the same time")
   HookConVarChange(g_h_sm_dodgeball_maxrockets, OnMaxRocketsChange)
   g_h_sm_dodgeball_reflectinc = CreateConVar("sm_dodgeball_reflectinc", "0.1", "Speed increment on deflection")
@@ -131,6 +134,11 @@ public OnMaxRocketsChange(Handle:cvar, const String:oldVal[], const String:newVa
 public OnDeflectIncChange(Handle:cvar, const String:oldVal[], const String:newVal[])
 {
   db_accel = StringToFloat(newVal)
+}
+
+public OnSpawnIntervalChange(Handle:cvar, const String:oldVal[], const String:newVal[])
+{
+  db_minDelay = StringToFloat(newVal)
 }
 
 public OnSpeedMulChange(Handle:cvar, const String:oldVal[], const String:newVal[])
@@ -210,12 +218,12 @@ public UpdateLaunch(rocket, const Float:launchplace[3])
   }
 }
 
-public lim(const Float:val, const Float:limVal)
+public Float:lim(const Float:val, const Float:limVal)
 {
   if (FloatAbs(val) > limVal)
     {
-    if (val < 0)
-      return (-1 * limVal)
+    if (val < 0.0)
+      return (-1.0 * limVal)
     else
       return limVal
     }
@@ -237,19 +245,19 @@ public LimitVectorVector(const Float:vec[3], const Float:factors[3], Float:resul
   result[2] = lim(vec[2], factors[2])
 }
 
-public CalcDistance(const Float:launchPos[3], const Float:currPos[3], const Float:targetPos[3])
+public Float:CalcDistance(const Float:launchPos[3], const Float:currPos[3], const Float:targetPos[3])
 {
   new Float:currVec[3]
   new Float:srcVec[3]
   if (launchPos[0] == 0.0)
-    return 0
+    return 0.0
   MakeVectorFromPoints(currPos, targetPos, currVec)
   MakeVectorFromPoints(launchPos, targetPos, srcVec)
   srcVec[2] = currVec[2] = 0.0
   return lim((GetVectorLength(currVec) / GetVectorLength(srcVec)) * 100.0, 99.0)
 }
 
-public GetZFix(const Float:dist)
+public Float:GetZFix(const Float:dist)
 {
 //return 40
 if ((dist > 90.0) || (dist < 60.0))
@@ -262,10 +270,10 @@ else // HOLY SHIT CRAZY MATHS
 // Rocket processing
 //=======================================
 
-stock GetSpawnerPos()
+stock GetSpawnerPos(Float:spawnerPos[3])
 {
   new Float:currPos[3]
-  new Float:spawnerPos[3]
+  spawnerPos = Float:{0.0, 0.0, 0.0}
   new resp = -1
   new Float:count = 0.0
   while ((resp = FindEntityByClassname(resp, "info_player_teamspawn")) != -1)
@@ -278,37 +286,44 @@ stock GetSpawnerPos()
   spawnerPos[0] /= count
   spawnerPos[1] /= count
   spawnerPos[2] = currPos[2] + 500
-  return spawnerPos
 }
 
 public InitGameRules()
 {
-  db_spawner = {0,0,0}
   db_maxRockets = 4
   db_accel = 0.1
   db_damage = 100
   db_baseSpeed = 1100 * 0.5
-  db_minDelay = 3
+  db_minDelay = 3.0
   db_activeRockets = 0
   LastVictim = RandomPlayer(2)
   LastVictimTeam = 2
-  LastKiller = RandomPlayer(3)
-  LastLaunch = GetTime()
+  //LastKiller = RandomPlayer(3)
+  LastLaunch = float(GetTime())
 }
 
 public Action:SpawnerThink(Handle:timer)
 {
-  new Integer:time
-  time = GetTime()
-  if (db_spawner[0] == 0)
+/*  new Float:currtime
+  new Integer:icurrtime
+  new Integer:ts[2]
+  GetTime(ts)
+  //PrintToChatAll("Now: %i, %i", ts[0], ts[1])
+  currtime = 1.4
+  currtime = float(ts[0])+1.4
+  PrintToChatAll("Now: %f/%i", currtime, ts[0])
+  if ((currtime - LastLaunch) < db_minDelay)
+    {
+    PrintToChatAll("Skipping, %f/%f/%f", currtime, LastLaunch, db_minDelay)
     return Plugin_Continue
-  if ((time - LastLaunch) < db_minDelay)
+    }*/
+  if (db_spawner[0] == 0)
     return Plugin_Continue
   if (db_activeRockets < db_maxRockets)
     {
     PrintToChatAll("Trying, %i/%i", db_activeRockets, db_maxRockets)
-    SpawnRocketEx(LastVictim, db_spawner, {89.0,0.0,0.0}, LastVictimTeam)
-    LastLaunch = time
+    SpawnRocketEx(LastVictim, db_spawner, Float:{89.0,0.0,0.0}, LastVictimTeam)
+    //LastLaunch = currtime
     }
   return Plugin_Continue
 }
@@ -317,7 +332,6 @@ public Action:RocketThink(Handle:timer)
 {
   //PrintToChatAll("Rocket::Think")
   new Float:ang[3]
-  new Float:vec[3]
   new Float:vel[3]
   new Float:srcVelocity
   new Float:rocketPos[3]
@@ -327,7 +341,7 @@ public Action:RocketThink(Handle:timer)
   new Float:fixVec[3]
   new Float:nFixVec[3]
   
-  new Integer:rocketCounter = 0       // to check stored value
+  new rocketCounter = 0       // to check stored value
 
   new Float:distance
   new rocket
@@ -349,6 +363,8 @@ public Action:RocketThink(Handle:timer)
       srcVelocity = GetVectorLength(vel)        // saving src speed for future use
 
       lTarget = Targets[i]
+      if (lTarget == -1)
+        continue
       rocketTeam = GetEntData(rocket, FindSendPropInfo("CTFProjectile_Rocket", "m_iTeamNum"))
       if (!((lTarget > 0) && IsValidEntity(lTarget) && IsClientInGame(lTarget) && IsPlayerAlive(lTarget)))
         {                                       // new rocket?
@@ -381,7 +397,7 @@ public Action:RocketThink(Handle:timer)
       
       SubtractVectors(nTargetVec, nRocketVec, fixVec)        // fixV = targetV - velocityV
       if (GetVectorLength(fixVec) < MINTURNRATIO)            // don't turn if direction is quite accurate
-          continue
+        continue
       NormalizeVector(fixVec, nFixVec)                       // fix normalization
       LimitVector(fixVec, MAXTURNRATIO, nFixVec)             // make it turn no more than allowed
 
@@ -412,7 +428,7 @@ public SpawnRocket(client)
 }
 
 
-public SpawnRocketEx(const Owner, const Float:position[3], const Float:direction[3], Integer:Team)
+public SpawnRocketEx(const Owner, const Float:position[3], const Float:direction[3], Team)
 {
   new ent_rocket
   new Float:vec[3]
@@ -448,12 +464,11 @@ public Event_StartTouch(entity, other)
   db_activeRockets--
 
   UpdateTarget(entity, 0)
-  UpdateLaunch(entity, {0,0,0})
+  UpdateLaunch(entity, Float:{0.0, 0.0, 0.0})
 
   GetEntDataVector(entity, FindSendPropInfo("CPhysicsProp", "m_vecOrigin"), pos)
   owner = GetEntDataEnt2(entity, FindSendPropInfo("CPhysicsProp", "m_hOwnerEntity"))
   // CreateExplosion(owner, pos)
-  //AcceptEntityInput(entity, "Explode", -1, -1, 0)
 }
 
 public CreateExplosion(owner, Float:pos[3])
@@ -469,10 +484,13 @@ public CreateExplosion(owner, Float:pos[3])
   DispatchSpawn(ent)
   TeleportEntity(ent, pos, NULL_VECTOR, NULL_VECTOR)
   
+//stock TE_SetupBeamRingPoint(const Float:center[3], Float:Start_Radius, Float:End_Radius, ModelIndex, HaloIndex, StartFrame, FrameRate, Float:Life, Float:Width, Float:Amplitude, const Color[4], Speed, Flags)
+
   pos[2] -= 40.0
-  TE_SetupBeamRingPoint(pos, 200.0, 100, g_BeamSprite, g_HaloSprite, 0, 15, 0.5, 5.0, 0.0, {128, 128, 128, 255}, 10, 0)
+  TE_SetupBeamRingPoint(pos, 200.0, 100.0, g_BeamSprite, g_HaloSprite, 0, 15, 0.5, 5.0, 0.0, {128, 128, 128, 255}, 10, 0)
+
   TE_SendToAll()
-  TE_SetupBeamRingPoint(pos, 200.0, 100, g_BeamSprite, g_HaloSprite, 0, 10, 0.6, 10.0, 0.5, {75, 255, 75, 255}, 10, 0)
+  TE_SetupBeamRingPoint(pos, 200.0, 100.0, g_BeamSprite, g_HaloSprite, 0, 10, 0.6, 10.0, 0.5, {75, 255, 75, 255}, 10, 0)
   TE_SendToAll()
 
   AcceptEntityInput(ent, "Explode", -1, -1, 0)
